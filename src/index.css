@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Cairo", sans-serif;
+}
+
+/* تحسين شكل الـ focus عشان يبقى واضح مع لوحة المفاتيح على كل الأزرار والروابط */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid theme("colors.amber.400");
+  outline-offset: 2px;
+  border-radius: 4px;
+}
