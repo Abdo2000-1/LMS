@@ -110,8 +110,7 @@ export default function Home() {
         return [course.title, course.description, course.grade].some((value) =>
           String(value || "").toLowerCase().includes(normalized)
         );
-      })
-      .slice(0, 4);
+      });
   }, [liveCourses, searchTerm]);
 
   useEffect(() => subscribeCourses(setLiveCourses), []);
