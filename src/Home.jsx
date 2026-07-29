@@ -177,7 +177,7 @@ export default function Home() {
                     leaveFrom="opacity-100 translate-y-0"
                     leaveTo="opacity-0 -translate-y-2"
                   >
-                    <Popover.Panel className="absolute left-0 mt-3 w-56 rounded-2xl bg-white dark:bg-slate-900 shadow-xl ring-1 ring-black/5 dark:ring-white/10 p-3 flex flex-col gap-1 z-50">
+                    <Popover.Panel className="absolute right-0 mt-3 w-56 rounded-2xl bg-white dark:bg-slate-900 shadow-xl ring-1 ring-black/5 dark:ring-white/10 p-3 flex flex-col gap-1 z-50">
                       {navLinks.map((l) => (
                         <a
                           key={l.label}
