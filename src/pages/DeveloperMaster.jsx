@@ -4,8 +4,7 @@ import { ShieldCheck, Users, BookOpen, Wallet, ArrowLeft } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { subscribeCourses, getTenantStudents } from "../services/courseService.js";
 import { subscribePayments } from "../services/paymentService.js";
-import AppHeader from "../components/AppHeader.jsx";
-import Footer from "../components/Footer.jsx";
+import DashboardLayout from "../components/DashboardLayout.jsx";
 
 export default function DeveloperMaster() {
   const { user } = useAuth();
@@ -33,13 +32,8 @@ export default function DeveloperMaster() {
   );
 
   return (
-    <div
-      dir="rtl"
-      className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Cairo',_sans-serif] transition-colors duration-500"
-    >
-      <AppHeader active="/dev/master" />
-
-      <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 space-y-8">
+    <DashboardLayout active="/dev/master">
+      <div className="space-y-8">
         <section className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-3xl p-8 text-white">
           <div className="flex items-center gap-3 mb-2">
             <ShieldCheck size={28} className="text-amber-300" />
@@ -106,9 +100,7 @@ export default function DeveloperMaster() {
             </span>
           </Link>
         </section>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

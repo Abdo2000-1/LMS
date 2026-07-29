@@ -1,4 +1,5 @@
 import { Popover, Transition } from "@headlessui/react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
@@ -17,9 +18,12 @@ import {
   X as XIcon,
   ArrowLeft,
   Languages,
+  LayoutDashboard,
 } from "lucide-react";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import Footer from "./components/Footer.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
+import { subscribeCourses } from "./services/courseService.js";
 
 /**
  * Home.jsx — منصة "الأستاذ" لتدريس اللغة العربية
@@ -39,45 +43,6 @@ const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08 } },
 };
-
-const courses = [
-  {
-    id: 1,
-    badge: "خصم خاص",
-    badgeColor: "bg-slate-800",
-    title: "كورس النحو والصرف كاملة",
-    tag: "٣ ثانوي",
-    price: "٣٥٠ج",
-    gradient: "from-slate-600 to-slate-900",
-  },
-  {
-    id: 2,
-    badge: "أونلاين",
-    badgeColor: "bg-emerald-700",
-    title: "كورس المراجعة النهائية كاملة (نحو + بلاغة)",
-    tag: "٣ ثانوي",
-    price: "١٢٠ج",
-    gradient: "from-teal-700 to-teal-950",
-  },
-  {
-    id: 3,
-    badge: "مجاني",
-    badgeColor: "bg-rose-700",
-    title: "الكورس التأسيسي المجاني في اللغة العربية للصف الثالث الثانوي دفعة ٢٠٢٧",
-    tag: "دفعة ٢٠٢٧",
-    price: "مجاني",
-    gradient: "from-blue-700 to-slate-900",
-  },
-  {
-    id: 4,
-    badge: "كورس مجاني",
-    badgeColor: "bg-rose-700",
-    title: "كورس ليالي الامتحان للثانوية العامة ٢٠٢٦",
-    tag: "٣ ثانوي",
-    price: "مجاني",
-    gradient: "from-rose-900 to-slate-950",
-  },
-];
 
 const grades = [
   { id: "٣", name: "الصف الثالث الثانوي", gradient: "from-amber-700 to-amber-950" },
@@ -132,6 +97,25 @@ const navLinks = [
 ];
 
 export default function Home() {
+  const { isAuthenticated, user, getLandingRouteByRole } = useAuth();
+  const [liveCourses, setLiveCourses] = useState([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dashboardPath = getLandingRouteByRole(user?.role);
+  const visibleCourses = useMemo(() => {
+    const normalized = searchTerm.trim().toLowerCase();
+    return liveCourses
+      .filter((course) => {
+        if (!normalized) return true;
+        return [course.title, course.description, course.grade].some((value) =>
+          String(value || "").toLowerCase().includes(normalized)
+        );
+      })
+      .slice(0, 4);
+  }, [liveCourses, searchTerm]);
+
+  useEffect(() => subscribeCourses(setLiveCourses), []);
+
   return (
     <div dir="rtl" className="min-h-screen">
       <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-['Cairo',_sans-serif] transition-colors duration-500 selection:bg-amber-300 selection:text-slate-900">
@@ -144,22 +128,35 @@ export default function Home() {
                 type="button"
                 aria-label="بحث في الكورسات"
                 title="بحث"
+                onClick={() => setSearchOpen((open) => !open)}
                 className="group flex items-center justify-center w-10 h-10 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-red-800 dark:hover:text-amber-400 transition-all duration-300"
               >
                 <Search size={18} className="group-hover:scale-110 transition-transform duration-300" />
               </button>
-              <Link
-                to="/login"
-                className="border border-red-800 text-red-800 dark:border-amber-400 dark:text-amber-400 rounded-full px-5 py-2 text-sm font-bold hover:bg-red-800 hover:text-white dark:hover:bg-amber-400 dark:hover:text-slate-950 transition-all duration-300 active:scale-95"
-              >
-                تسجيل الدخول
-              </Link>
-              <Link
-                to="/register"
-                className="bg-red-800 text-white rounded-full px-5 py-2 text-sm font-bold shadow-sm hover:bg-red-900 hover:shadow-lg hover:shadow-red-800/30 dark:hover:shadow-red-900/40 transition-all duration-300 active:scale-95"
-              >
-                حساب جديد
-              </Link>
+              {isAuthenticated ? (
+                <Link
+                  to={dashboardPath}
+                  className="inline-flex items-center gap-2 bg-red-800 text-white rounded-full px-5 py-2 text-sm font-bold shadow-sm hover:bg-red-900 hover:shadow-lg hover:shadow-red-800/30 dark:hover:shadow-red-900/40 transition-all duration-300 active:scale-95"
+                >
+                  <LayoutDashboard size={16} />
+                  لوحتي
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="border border-red-800 text-red-800 dark:border-amber-400 dark:text-amber-400 rounded-full px-5 py-2 text-sm font-bold hover:bg-red-800 hover:text-white dark:hover:bg-amber-400 dark:hover:text-slate-950 transition-all duration-300 active:scale-95"
+                  >
+                    تسجيل الدخول
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="bg-red-800 text-white rounded-full px-5 py-2 text-sm font-bold shadow-sm hover:bg-red-900 hover:shadow-lg hover:shadow-red-800/30 dark:hover:shadow-red-900/40 transition-all duration-300 active:scale-95"
+                  >
+                    حساب جديد
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -191,18 +188,29 @@ export default function Home() {
                         </a>
                       ))}
                       <hr className="my-1 border-slate-100 dark:border-slate-800" />
-                      <Link
-                        to="/login"
-                        className="px-3 py-2 rounded-lg text-sm font-bold text-red-800 dark:text-amber-400 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors duration-200 text-right"
-                      >
-                        تسجيل الدخول
-                      </Link>
-                      <Link
-                        to="/register"
-                        className="px-3 py-2 rounded-lg text-sm font-bold bg-red-800 text-white hover:bg-red-900 transition-colors duration-200 text-right"
-                      >
-                        حساب جديد
-                      </Link>
+                      {isAuthenticated ? (
+                        <Link
+                          to={dashboardPath}
+                          className="px-3 py-2 rounded-lg text-sm font-bold bg-red-800 text-white hover:bg-red-900 transition-colors duration-200 text-right"
+                        >
+                          لوحتي
+                        </Link>
+                      ) : (
+                        <>
+                          <Link
+                            to="/login"
+                            className="px-3 py-2 rounded-lg text-sm font-bold text-red-800 dark:text-amber-400 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors duration-200 text-right"
+                          >
+                            تسجيل الدخول
+                          </Link>
+                          <Link
+                            to="/register"
+                            className="px-3 py-2 rounded-lg text-sm font-bold bg-red-800 text-white hover:bg-red-900 transition-colors duration-200 text-right"
+                          >
+                            حساب جديد
+                          </Link>
+                        </>
+                      )}
                     </Popover.Panel>
                   </Transition>
                 </>
@@ -225,15 +233,26 @@ export default function Home() {
             {/* Right cluster: theme toggle + logo */}
             <div className="flex items-center gap-4">
               <ThemeToggle />
-              <a
-                href="#"
+              <Link
+                to="/"
                 className="flex items-center gap-1.5 text-2xl font-extrabold text-red-800 dark:text-amber-400 tracking-tight transition-colors duration-500"
               >
                 الأستاذ
                 <Languages size={22} strokeWidth={2} />
-              </a>
+              </Link>
             </div>
           </div>
+          {searchOpen && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-8 pb-3">
+              <input
+                autoFocus
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="ابحث باسم الكورس أو الصف..."
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-300"
+              />
+            </div>
+          )}
         </header>
 
         {/* Hero */}
@@ -295,10 +314,10 @@ export default function Home() {
                 لأعلى الدرجات في الثانوي العام
               </p>
               <Link
-                to="/register"
+                to={isAuthenticated ? dashboardPath : "/register"}
                 className="group bg-white text-red-800 font-extrabold px-8 py-3 rounded-xl shadow-lg shadow-black/20 hover:bg-amber-300 hover:text-red-950 hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 active:translate-y-0 active:scale-95 inline-flex items-center gap-2"
               >
-                انشئ حسابك الآن
+                {isAuthenticated ? "افتح لوحتك" : "انشئ حسابك الآن"}
                 <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform duration-300" />
               </Link>
             </motion.div>
@@ -351,39 +370,51 @@ export default function Home() {
             variants={stagger}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
           >
-            {courses.map((c) => (
+            {visibleCourses.map((c) => (
               <motion.div
                 key={c.id}
                 variants={fadeUp}
                 whileHover={{ y: -6 }}
                 className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:shadow-slate-300/50 dark:hover:shadow-black/40 transition-all duration-300 overflow-hidden flex flex-col"
               >
-                <div className={`h-40 w-full flex items-center justify-center text-white relative bg-gradient-to-br ${c.gradient} overflow-hidden`}>
-                  <span className={`absolute top-2 right-2 text-xs font-bold text-white px-2 py-1 rounded-md ${c.badgeColor} shadow-sm`}>
-                    {c.badge}
-                  </span>
-                  <BookOpen
-                    size={40}
-                    className="opacity-70 group-hover:scale-110 group-hover:opacity-90 transition-all duration-500"
-                  />
+                <div className="h-40 w-full flex items-center justify-center text-white relative bg-slate-900 overflow-hidden">
+                  {c.thumbnailUrl ? (
+                    <img
+                      src={c.thumbnailUrl}
+                      alt={c.title}
+                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <BookOpen
+                      size={40}
+                      className="opacity-70 group-hover:scale-110 group-hover:opacity-90 transition-all duration-500"
+                    />
+                  )}
+                  {Number(c.discountPercent || 0) > 0 && (
+                    <span className="absolute top-2 right-2 text-xs font-bold text-white px-2 py-1 rounded-md bg-red-700 shadow-sm">
+                      خصم {c.discountPercent}%
+                    </span>
+                  )}
                 </div>
                 <div className="p-4 flex flex-col gap-3 flex-1 text-right">
                   <h3 className="font-bold text-sm leading-snug flex-1 group-hover:text-red-800 dark:group-hover:text-amber-400 transition-colors duration-300">
                     {c.title}
                   </h3>
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>{c.tag}</span>
-                    <span className="font-bold text-red-800 dark:text-amber-400">{c.price}</span>
+                    <span>{c.grade || "ثانوي"}</span>
+                    <span className="font-bold text-red-800 dark:text-amber-400">
+                      {Number(c.price || 0) === 0 ? "مجاني" : `${c.price} ج.م`}
+                    </span>
                   </div>
                   <div className="flex flex-col gap-2 pt-2">
                     <Link
-                      to="/login"
+                      to={isAuthenticated ? `/courses/${c.id}` : "/login"}
                       className="text-center border border-red-800 dark:border-amber-400 text-red-800 dark:text-amber-400 rounded-lg py-2 text-sm font-bold hover:bg-red-800 hover:text-white dark:hover:bg-amber-400 dark:hover:text-slate-950 transition-all duration-300 active:scale-[0.97]"
                     >
                       الدخول للكورس
                     </Link>
                     <Link
-                      to="/register"
+                      to={isAuthenticated ? `/courses/${c.id}/payment` : "/register"}
                       className="text-center bg-red-700 text-white rounded-lg py-2 text-sm font-bold hover:bg-red-800 hover:shadow-md hover:shadow-red-700/30 transition-all duration-300 active:scale-[0.97]"
                     >
                       الإشتراك في الكورس!
@@ -393,6 +424,12 @@ export default function Home() {
               </motion.div>
             ))}
           </motion.div>
+
+          {visibleCourses.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-8 text-center text-slate-500 dark:text-slate-400">
+              لا توجد كورسات مضافة حاليًا.
+            </div>
+          )}
 
           <div className="flex justify-center gap-2 mt-8">
             {Array.from({ length: 7 }).map((_, i) => (
@@ -429,10 +466,10 @@ export default function Home() {
                 الخاص بيك، المنصة متاحة على:
               </p>
               <Link
-                to="/register"
+                to={isAuthenticated ? dashboardPath : "/register"}
                 className="inline-block bg-red-800 text-white font-extrabold px-6 py-3 rounded-xl hover:bg-red-900 hover:shadow-lg hover:shadow-red-800/30 transition-all duration-300 active:scale-95"
               >
-                انشئ حسابك الآن
+                {isAuthenticated ? "افتح لوحتك" : "انشئ حسابك الآن"}
               </Link>
             </motion.div>
 
@@ -564,10 +601,10 @@ export default function Home() {
                 <br />و ابدأ مرحلة جديدة في حياتك
               </h2>
               <Link
-                to="/register"
+                to={isAuthenticated ? dashboardPath : "/register"}
                 className="group bg-red-800 text-white font-extrabold px-8 py-3 rounded-xl hover:bg-red-900 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-800/30 transition-all duration-300 active:translate-y-0 active:scale-95 inline-flex items-center gap-2"
               >
-                انشئ حسابك الآن
+                {isAuthenticated ? "افتح لوحتك" : "انشئ حسابك الآن"}
                 <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform duration-300" />
               </Link>
             </motion.div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BookOpen, PlayCircle } from "lucide-react";
+import { BookOpen, PlayCircle, Search } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { subscribeCourses } from "../services/courseService.js";
 import AppHeader from "../components/AppHeader.jsx";
@@ -20,10 +20,18 @@ function getFinalPrice(course) {
 export default function Courses() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => subscribeCourses(setCourses), []);
 
   const enrolledSet = useMemo(() => new Set(user?.enrolledCourses || []), [user?.enrolledCourses]);
+  const filteredCourses = useMemo(() => {
+    const normalized = searchTerm.trim().toLowerCase();
+    if (!normalized) return courses;
+    return courses.filter((course) =>
+      [course.title, course.description, course.grade].some((value) => String(value || "").toLowerCase().includes(normalized))
+    );
+  }, [courses, searchTerm]);
 
   return (
     <div
@@ -40,8 +48,18 @@ export default function Courses() {
           </p>
         </div>
 
+        <div className="relative mb-8">
+          <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="ابحث عن كورس، صف، أو وصف..."
+            className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 pr-12 pl-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-300"
+          />
+        </div>
+
         <motion.div initial="hidden" animate="show" variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => {
+          {filteredCourses.map((course) => {
             const enrolled = enrolledSet.has(course.id);
             const finalPrice = getFinalPrice(course);
             return (
@@ -118,6 +136,12 @@ export default function Courses() {
             );
           })}
         </motion.div>
+
+        {filteredCourses.length === 0 && (
+          <div className="mt-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-8 text-center text-slate-500 dark:text-slate-400">
+            لا توجد كورسات مطابقة للبحث.
+          </div>
+        )}
       </main>
 
       <Footer />

@@ -41,12 +41,21 @@ export function AuthProvider({ children }) {
         doc(db, "users", nextUser.uid),
         (snapshot) => {
           const profile = snapshot.exists() ? snapshot.data() : {};
+          if (profile.isBlocked) {
+            logoutRequest().finally(() => {
+              setUser(null);
+              setToken(null);
+              setIsLoading(false);
+            });
+            return;
+          }
           setUser({
             ...nextUser,
             ...profile,
             uid: nextUser.uid,
             enrolledCourses: profile.enrolledCourses || nextUser.enrolledCourses || [],
             progress: profile.progress || nextUser.progress || {},
+            quizResults: profile.quizResults || nextUser.quizResults || {},
           });
           setIsLoading(false);
         },

@@ -8,6 +8,35 @@ html {
 
 body {
   font-family: "Cairo", sans-serif;
+  background: theme("colors.slate.50");
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: theme("colors.amber.300");
+  color: theme("colors.slate.950");
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme("colors.slate.300") transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: theme("colors.slate.300");
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: theme("colors.amber.400");
 }
 
 /* تحسين شكل الـ focus عشان يبقى واضح مع لوحة المفاتيح على كل الأزرار والروابط */

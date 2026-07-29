@@ -1,4 +1,4 @@
-export async function uploadImageToCloudinary(file) {
+async function uploadToCloudinary(file, resourceType = "image") {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UNSIGNED_PRESET;
 
@@ -10,7 +10,7 @@ export async function uploadImageToCloudinary(file) {
   formData.append("file", file);
   formData.append("upload_preset", uploadPreset);
 
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
     method: "POST",
     body: formData,
   });
@@ -21,4 +21,12 @@ export async function uploadImageToCloudinary(file) {
   }
 
   return payload.secure_url;
+}
+
+export function uploadImageToCloudinary(file) {
+  return uploadToCloudinary(file, "image");
+}
+
+export function uploadFileToCloudinary(file) {
+  return uploadToCloudinary(file, "raw");
 }

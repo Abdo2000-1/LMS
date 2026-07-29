@@ -4,8 +4,7 @@ import { Link } from "react-router-dom";
 import { BookOpen, ClipboardCheck, Award, ArrowLeft, Flame, PlayCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { subscribeCourses } from "../services/courseService.js";
-import AppHeader from "../components/AppHeader.jsx";
-import Footer from "../components/Footer.jsx";
+import DashboardLayout from "../components/DashboardLayout.jsx";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -43,13 +42,8 @@ export default function Dashboard() {
   ];
 
   return (
-    <div
-      dir="rtl"
-      className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Cairo',_sans-serif] transition-colors duration-500"
-    >
-      <AppHeader active="/dashboard" />
-
-      <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 space-y-12">
+    <DashboardLayout active="/dashboard">
+      <div className="space-y-10">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -129,9 +123,7 @@ export default function Dashboard() {
             </Link>
           </section>
         )}
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

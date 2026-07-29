@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Wallet, ArrowLeft, ReceiptText, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { enrollStudentInCourse, getCourseById } from "../services/courseService.js";
-import { createPaymentOrder } from "../services/paymentService.js";
+import { getCourseById } from "../services/courseService.js";
+import { createPaymentOrder, verifyPaymentOrder } from "../services/paymentService.js";
 import AppHeader from "../components/AppHeader.jsx";
 import Footer from "../components/Footer.jsx";
 
@@ -21,6 +21,7 @@ export default function Payment() {
   const [course, setCourse] = useState(null);
   const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -38,12 +39,31 @@ export default function Payment() {
     setError("");
     try {
       const order = await createPaymentOrder({ user, course });
-      await enrollStudentInCourse({ uid: user.uid, courseId: course.id });
       setResult(order);
     } catch (checkoutError) {
       setError(checkoutError.message || "تعذر تنفيذ عملية الدفع.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleVerifyPayment() {
+    if (!result || !course || !user) return;
+    setIsVerifying(true);
+    setError("");
+    try {
+      const verification = await verifyPaymentOrder({
+        paymentId: result.paymentId,
+      });
+      if (!verification.paid) {
+        setError(`الدفع لم يكتمل حتى الآن. الحالة الحالية: ${verification.status}`);
+        return;
+      }
+      setResult((prev) => ({ ...prev, paid: true }));
+    } catch (verifyError) {
+      setError(verifyError.message || "تعذر التحقق من الدفع.");
+    } finally {
+      setIsVerifying(false);
     }
   }
 
@@ -125,7 +145,7 @@ export default function Payment() {
                 كود المرجع: <span className="font-bold">{result.referenceCode}</span>
               </p>
               <a
-                href={result.paymentUrl}
+                href={result.paymentUrl || "#"}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 bg-amber-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors duration-300"
@@ -133,9 +153,17 @@ export default function Payment() {
                 التحويل إلى فوري باي
                 <ArrowLeft size={14} />
               </a>
+              <button
+                type="button"
+                onClick={handleVerifyPayment}
+                disabled={isVerifying || result.paid}
+                className="block w-full sm:w-auto bg-red-800 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-900 transition-colors duration-300 disabled:opacity-60"
+              >
+                {result.paid ? "تم تأكيد الدفع وفتح الكورس" : isVerifying ? "جاري التحقق..." : "تحقّق من الدفع وافتح الكورس"}
+              </button>
               <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
                 <ShieldCheck size={12} />
-                بعد الدفع، الاشتراك مسجل على حسابك ويمكنك بدء الكورس فورًا.
+                الاشتراك لا يفتح إلا بعد رجوع حالة الدفع من فوري بأنه مكتمل.
               </p>
             </div>
           )}

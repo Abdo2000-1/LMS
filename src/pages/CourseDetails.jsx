@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CheckCircle2, CirclePlay, Lock, NotebookPen, Timer, ArrowLeft } from "lucide-react";
+import { CheckCircle2, CirclePlay, Lock, NotebookPen, Timer, ArrowLeft, FileText, HelpCircle, BarChart3 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getCourseById, markLessonCompleted } from "../services/courseService.js";
+import { buildCourseContent, getCourseById, markLessonCompleted, submitQuizAttempt } from "../services/courseService.js";
 import AppHeader from "../components/AppHeader.jsx";
 import Footer from "../components/Footer.jsx";
 
@@ -17,9 +17,13 @@ export default function CourseDetails() {
   const { user } = useAuth();
 
   const [course, setCourse] = useState(null);
-  const [selectedUnitIndex, setSelectedUnitIndex] = useState(0);
+  const [selectedContentIndex, setSelectedContentIndex] = useState(0);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizResult, setQuizResult] = useState(null);
   const [isSavingProgress, setIsSavingProgress] = useState(false);
+  const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
   const [error, setError] = useState("");
+  const playerRef = useRef(null);
 
   const watchedLessons = useMemo(() => user?.progress?.[courseId]?.watchedLessons || [], [user?.progress, courseId]);
   const enrolled = useMemo(() => (user?.enrolledCourses || []).includes(courseId), [user?.enrolledCourses, courseId]);
@@ -51,12 +55,17 @@ export default function CourseDetails() {
     return [...course.quizzes].sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [course?.quizzes]);
 
-  const selectedUnit = units[selectedUnitIndex] || null;
-  const selectedUnlocked =
-    selectedUnit && (enrolled || selectedUnit.isFree || lessonUnlocked(selectedUnitIndex, units, watchedLessons));
+  const contentItems = useMemo(() => buildCourseContent(course || {}), [course]);
+  const selectedContent = contentItems[selectedContentIndex] || null;
+  const selectedUnit =
+    selectedContent?.type === "video" ? selectedContent : units.find((unit) => unit.unitId === selectedContent?.unitId) || null;
+  const selectedUnitIndex = selectedUnit ? units.findIndex((unit) => unit.unitId === selectedUnit.unitId) : -1;
+  const selectedUnlocked = selectedContent
+    ? selectedContent.isFree || enrolled || (selectedUnitIndex >= 0 && lessonUnlocked(selectedUnitIndex, units, watchedLessons))
+    : false;
 
   async function completeLesson() {
-    if (!selectedUnit || !enrolled) return;
+    if (!selectedUnit || !enrolled || watchedLessons.includes(selectedUnit.unitId)) return;
     setIsSavingProgress(true);
     setError("");
     try {
@@ -70,6 +79,69 @@ export default function CourseDetails() {
       setError(saveError.message || "تعذر حفظ تقدم الدرس.");
     } finally {
       setIsSavingProgress(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedUnit || !selectedUnlocked || !enrolled) return undefined;
+
+    let cancelled = false;
+
+    function setupPlayer() {
+      if (cancelled || !window.YT?.Player) return;
+      if (playerRef.current?.destroy) playerRef.current.destroy();
+      playerRef.current = new window.YT.Player("course-video-player", {
+        events: {
+          onStateChange: (event) => {
+            if (event.data === window.YT.PlayerState.ENDED) {
+              completeLesson();
+            }
+          },
+        },
+      });
+    }
+
+    if (window.YT?.Player) {
+      setupPlayer();
+    } else {
+      const existingScript = document.querySelector("script[src='https://www.youtube.com/iframe_api']");
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(script);
+      }
+      const previousReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof previousReady === "function") previousReady();
+        setupPlayer();
+      };
+    }
+
+    return () => {
+      cancelled = true;
+      if (playerRef.current?.destroy) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [enrolled, selectedUnit?.unitId, selectedUnit?.youtubeVideoId, selectedUnlocked, watchedLessons]);
+
+  async function handleSubmitQuiz() {
+    if (!selectedContent || selectedContent.type !== "quiz" || !enrolled) return;
+    setIsSubmittingQuiz(true);
+    setError("");
+    setQuizResult(null);
+    try {
+      const result = await submitQuizAttempt({
+        uid: user.uid,
+        courseId,
+        quiz: { ...selectedContent, answers: quizAnswers },
+      });
+      setQuizResult(result);
+    } catch (quizError) {
+      setError(quizError.message || "تعذر تصحيح الكويز.");
+    } finally {
+      setIsSubmittingQuiz(false);
     }
   }
 
@@ -118,13 +190,16 @@ export default function CourseDetails() {
         )}
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-black rounded-2xl overflow-hidden ring-1 ring-black/10">
-            {selectedUnit && selectedUnlocked ? (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
+            {selectedContent?.type === "video" && selectedUnit && selectedUnlocked ? (
               <div className="relative pb-[56.25%] h-0">
                 <iframe
+                  id="course-video-player"
                   title={selectedUnit.title}
-                  src={`https://www.youtube.com/embed/${selectedUnit.youtubeVideoId}?rel=0&modestbranding=1`}
+                  src={`https://www.youtube-nocookie.com/embed/${selectedUnit.youtubeVideoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
                   className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                 />
                 <div className="pointer-events-none absolute inset-0">
@@ -133,9 +208,81 @@ export default function CourseDetails() {
                   </div>
                 </div>
               </div>
+            ) : selectedContent?.type === "resource" && selectedUnlocked ? (
+              <div className="min-h-[320px] flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <FileText size={54} className="text-red-800 dark:text-amber-400" />
+                <div>
+                  <h2 className="text-xl font-extrabold">{selectedContent.title}</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{selectedContent.fileName || "ملف مرفق بالكورس"}</p>
+                </div>
+                <a
+                  href={selectedContent.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-900 transition-colors"
+                >
+                  فتح الملف
+                  <ArrowLeft size={15} />
+                </a>
+              </div>
+            ) : selectedContent?.type === "quiz" && selectedUnlocked ? (
+              <div className="p-5 sm:p-7 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-extrabold">{selectedContent.title}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {selectedContent.questions?.length || 0} سؤال · {selectedContent.minutes || 10} دقيقة
+                    </p>
+                  </div>
+                  {user?.quizResults?.[courseId]?.[selectedContent.quizId] && (
+                    <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                      آخر درجة: {user.quizResults[courseId][selectedContent.quizId].percentage}%
+                    </div>
+                  )}
+                </div>
+
+                {(selectedContent.questions || []).map((question, questionIndex) => (
+                  <div key={question.questionId} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-4">
+                    <p className="font-bold mb-3">
+                      {questionIndex + 1}. {question.prompt}
+                    </p>
+                    <div className="grid gap-2">
+                      {question.choices.map((choice, choiceIndex) => (
+                        <label
+                          key={`${question.questionId}-${choiceIndex}`}
+                          className="flex items-center gap-2 rounded-xl bg-white dark:bg-slate-900 px-3 py-2 text-sm cursor-pointer border border-transparent hover:border-amber-300"
+                        >
+                          <input
+                            type="radio"
+                            name={question.questionId}
+                            checked={Number(quizAnswers[question.questionId]) === choiceIndex}
+                            onChange={() => setQuizAnswers((prev) => ({ ...prev, [question.questionId]: choiceIndex }))}
+                          />
+                          <span>{choice}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {quizResult && (
+                  <div className="rounded-2xl bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 p-4 text-amber-900 dark:text-amber-200">
+                    درجتك: {quizResult.earnedPoints} من {quizResult.totalPoints} · {quizResult.percentage}%
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!enrolled || isSubmittingQuiz}
+                  onClick={handleSubmitQuiz}
+                  className="w-full rounded-xl bg-red-800 py-3 font-extrabold text-white hover:bg-red-900 disabled:opacity-60"
+                >
+                  {isSubmittingQuiz ? "جاري التصحيح..." : "تصحيح الكويز"}
+                </button>
+              </div>
             ) : (
-              <div className="h-[320px] flex items-center justify-center text-white/80 text-sm">
-                {selectedUnit ? "هذا الدرس مقفول لحين إنهاء الدروس السابقة." : "اختر درسًا من القائمة."}
+              <div className="h-[320px] flex items-center justify-center bg-black text-white/80 text-sm">
+                {selectedContent ? "هذا المحتوى مقفول لحين الاشتراك أو فتح المحتوى السابق." : "اختر عنصرًا من محتوى الكورس."}
               </div>
             )}
           </div>
@@ -143,26 +290,39 @@ export default function CourseDetails() {
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 ring-1 ring-black/5 dark:ring-white/10">
             <h2 className="font-extrabold mb-3">محتوى الكورس</h2>
             <div className="space-y-2 max-h-[23rem] overflow-auto pr-1">
-              {units.map((unit, index) => {
-                const unlocked = enrolled || unit.isFree || lessonUnlocked(index, units, watchedLessons);
-                const watched = watchedLessons.includes(unit.unitId);
+              {contentItems.map((item, index) => {
+                const unitIndex = item.type === "video" ? units.findIndex((unit) => unit.unitId === item.unitId) : -1;
+                const unlocked = item.isFree || enrolled || (unitIndex >= 0 && lessonUnlocked(unitIndex, units, watchedLessons));
+                const watched = item.type === "video" && watchedLessons.includes(item.unitId);
+                const Icon = item.type === "resource" ? FileText : item.type === "quiz" ? HelpCircle : CirclePlay;
+                const progress = item.type === "video" && watched ? 100 : 0;
                 return (
                   <button
-                    key={unit.unitId}
+                    key={`${item.type}-${item.unitId || item.resourceId || item.quizId}`}
                     type="button"
                     disabled={!unlocked}
-                    onClick={() => setSelectedUnitIndex(index)}
+                    onClick={() => {
+                      setSelectedContentIndex(index);
+                      setQuizResult(null);
+                    }}
                     className={`w-full text-right rounded-xl border px-3 py-3 flex items-center justify-between gap-2 transition-all duration-300 ${
-                      index === selectedUnitIndex
+                      index === selectedContentIndex
                         ? "border-red-800 dark:border-amber-400 bg-red-50 dark:bg-amber-400/10"
                         : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950"
                     } ${!unlocked ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
-                    <div>
-                      <p className="text-sm font-bold">{unit.title}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">الدرس {index + 1}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold truncate">{item.title}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {item.type === "resource" ? "ملف" : item.type === "quiz" ? "كويز" : `درس ${unitIndex + 1}`}
+                      </p>
+                      {item.type === "video" && (
+                        <div className="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div className="h-full rounded-full bg-red-800 dark:bg-amber-400" style={{ width: `${progress}%` }} />
+                        </div>
+                      )}
                     </div>
-                    {watched ? <CheckCircle2 size={18} className="text-emerald-500" /> : unlocked ? <CirclePlay size={18} /> : <Lock size={16} />}
+                    {watched ? <CheckCircle2 size={18} className="text-emerald-500" /> : unlocked ? <Icon size={18} /> : <Lock size={16} />}
                   </button>
                 );
               })}
@@ -172,25 +332,24 @@ export default function CourseDetails() {
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-slate-50 dark:bg-slate-900 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/10">
-            <h2 className="font-extrabold mb-3">الكويزات</h2>
-            {quizzes.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">لا يوجد كويزات مضافة حتى الآن.</p>
-            ) : (
-              <div className="space-y-3">
-                {quizzes.map((quiz) => (
-                  <div key={quiz.quizId} className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-between">
-                    <div className="text-right">
-                      <p className="font-bold">{quiz.title}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">عدد الأسئلة: {quiz.questionsCount}</p>
-                    </div>
-                    <div className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                      <Timer size={14} />
-                      {quiz.minutes} دقيقة
-                    </div>
-                  </div>
-                ))}
+            <h2 className="font-extrabold mb-3 flex items-center gap-2">
+              <BarChart3 size={18} />
+              مؤشراتك في الكورس
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-xl bg-white dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">الفيديوهات المكتملة</p>
+                <p className="text-2xl font-extrabold">{watchedLessons.length}/{units.length}</p>
               </div>
-            )}
+              <div className="rounded-xl bg-white dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">تقدم الكورس</p>
+                <p className="text-2xl font-extrabold">{user?.progress?.[courseId]?.percentage || 0}%</p>
+              </div>
+              <div className="rounded-xl bg-white dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400">الكويزات</p>
+                <p className="text-2xl font-extrabold">{Object.keys(user?.quizResults?.[courseId] || {}).length}/{quizzes.length}</p>
+              </div>
+            </div>
           </div>
 
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/10 space-y-3">

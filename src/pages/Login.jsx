@@ -1,15 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Phone, Lock, Eye, EyeOff, Languages, ArrowLeft, Loader2, Shield } from "lucide-react";
+import { Phone, Lock, Eye, EyeOff, Languages, ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 
-const TEACHER_PHONE = import.meta.env.VITE_TEACHER_PHONE || "";
-const DEVELOPER_PHONE = import.meta.env.VITE_DEVELOPER_PHONE || "";
-
 export default function Login() {
-  const { login, getLandingRouteByRole } = useAuth();
+  const { login, getLandingRouteByRole, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -18,6 +15,12 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(getLandingRouteByRole(user?.role), { replace: true });
+    }
+  }, [getLandingRouteByRole, isAuthenticated, navigate, user?.role]);
 
   function validate(values) {
     const errs = {};
@@ -91,30 +94,6 @@ export default function Login() {
             <p className="text-sm text-slate-500 dark:text-slate-400">
               تسجيل الدخول يتم برقم الهاتف وكلمة المرور فقط
             </p>
-          </div>
-
-          <div className="space-y-2 mb-6">
-            {TEACHER_PHONE && (
-              <button
-                type="button"
-                onClick={() => setForm({ phone: TEACHER_PHONE, password: "" })}
-                className="w-full flex items-start gap-2 text-xs bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-300"
-              >
-                <Shield size={16} className="shrink-0 mt-0.5" />
-                <span>حساب المدرّس الخاص.</span>
-              </button>
-            )}
-
-            {DEVELOPER_PHONE && (
-              <button
-                type="button"
-                onClick={() => setForm({ phone: DEVELOPER_PHONE, password: "" })}
-                className="w-full flex items-start gap-2 text-xs bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-300"
-              >
-                <Shield size={16} className="shrink-0 mt-0.5" />
-                <span>حساب المطور الرئيسي.</span>
-              </button>
-            )}
           </div>
 
           {serverError && (

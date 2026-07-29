@@ -5,11 +5,8 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { auth, db, tenantId } from "../services/firebase.js";
-
-const RESERVED_TEACHER_PHONE = normalizePhone(import.meta.env.VITE_TEACHER_PHONE || "");
-const RESERVED_DEVELOPER_PHONE = normalizePhone(import.meta.env.VITE_DEVELOPER_PHONE || "");
 
 const GOVERNORATES = [
   "القاهرة",
@@ -70,15 +67,13 @@ function mapFirebaseError(error) {
   return "حدث خطأ في المصادقة، حاول مرة أخرى.";
 }
 
-function getReservedRoleByPhone(phone) {
-  if (phone && phone === RESERVED_TEACHER_PHONE) return "teacher";
-  if (phone && phone === RESERVED_DEVELOPER_PHONE) return "developer";
-  return "student";
-}
-
 async function getUserProfile(uid) {
   const snap = await getDoc(doc(db, "users", uid));
   return snap.exists() ? { uid, ...snap.data() } : null;
+}
+
+function normalizeRole(role) {
+  return ["student", "teacher", "developer"].includes(role) ? role : "student";
 }
 
 function toPublicUser(profile, firebaseUser) {
@@ -87,55 +82,38 @@ function toPublicUser(profile, firebaseUser) {
     name: profile?.name || firebaseUser.displayName || "مستخدم",
     email: profile?.email || firebaseUser.email || "",
     phone: profile?.phone || "",
-    role: profile?.role || "student",
+    role: normalizeRole(profile?.role),
     grade: profile?.grade || "",
     governorate: profile?.governorate || "",
     tenantId: profile?.tenantId || tenantId,
     enrolledCourses: profile?.enrolledCourses || [],
     progress: profile?.progress || {},
+    quizResults: profile?.quizResults || {},
     isBlocked: Boolean(profile?.isBlocked),
   };
-}
-
-async function ensurePrivilegedProfile(firebaseUser, phone) {
-  const profile = await getUserProfile(firebaseUser.uid);
-  if (profile) return profile;
-
-  const role = getReservedRoleByPhone(phone);
-  if (role === "student") return null;
-
-  const privilegedProfile = {
-    uid: firebaseUser.uid,
-    tenantId,
-    role,
-    phone,
-    name: role === "teacher" ? "حساب المدرس" : "حساب المطور",
-    email: firebaseUser.email || "",
-    grade: "",
-    governorate: "",
-    enrolledCourses: [],
-    progress: {},
-    isBlocked: false,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-
-  await setDoc(doc(db, "users", firebaseUser.uid), privilegedProfile, { merge: true });
-  return privilegedProfile;
 }
 
 export async function registerRequest({ name, email, phone, grade, governorate, password }) {
   const normalizedPhone = normalizePhone(phone);
   const normalizedEmail = String(email || "").trim().toLowerCase();
-  const role = getReservedRoleByPhone(normalizedPhone);
-
-  if (role !== "student") {
-    throw new Error("هذا الرقم مخصص لحساب إداري ولا يمكن التسجيل به كطالب.");
-  }
 
   const authEmail = buildLoginEmailFromPhone(normalizedPhone);
 
   try {
+    const phoneSnap = await getDocs(
+      query(collection(db, "users"), where("tenantId", "==", tenantId), where("phone", "==", normalizedPhone))
+    );
+    if (!phoneSnap.empty) {
+      throw new Error("رقم الموبايل مسجل بالفعل. جرّب تسجيل الدخول.");
+    }
+
+    const emailSnap = await getDocs(
+      query(collection(db, "users"), where("tenantId", "==", tenantId), where("email", "==", normalizedEmail))
+    );
+    if (!emailSnap.empty) {
+      throw new Error("البريد الإلكتروني مسجل بالفعل. استخدم بريدًا آخر.");
+    }
+
     const credential = await createUserWithEmailAndPassword(auth, authEmail, password);
     await updateProfile(credential.user, { displayName: name.trim() });
 
@@ -159,6 +137,9 @@ export async function registerRequest({ name, email, phone, grade, governorate, 
     const token = await credential.user.getIdToken();
     return { user: toPublicUser(profile, credential.user), token };
   } catch (error) {
+    if (error instanceof Error && !error?.code?.startsWith?.("auth/")) {
+      throw error;
+    }
     throw new Error(mapFirebaseError(error));
   }
 }
@@ -169,11 +150,10 @@ export async function loginRequest({ phone, password }) {
 
   try {
     const credential = await signInWithEmailAndPassword(auth, authEmail, password);
-    const fallbackRole = getReservedRoleByPhone(normalizedPhone);
-    const profile = (await getUserProfile(credential.user.uid)) || (await ensurePrivilegedProfile(credential.user, normalizedPhone));
+    const profile = await getUserProfile(credential.user.uid);
     const user = toPublicUser(
       profile || {
-        role: fallbackRole,
+        role: "student",
         phone: normalizedPhone,
       },
       credential.user
@@ -222,6 +202,11 @@ export function watchAuthState(callback) {
 
     const profile = await getUserProfile(firebaseUser.uid);
     const user = toPublicUser(profile, firebaseUser);
+    if (user.isBlocked) {
+      await signOut(auth);
+      callback(null, null);
+      return;
+    }
     const token = await firebaseUser.getIdToken();
     callback(user, token);
   });
