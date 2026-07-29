@@ -6,7 +6,11 @@ import Home from "./Home.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import TeacherDashboard from "./pages/TeacherDashboard.jsx";
+import DeveloperMaster from "./pages/DeveloperMaster.jsx";
 import Courses from "./pages/Courses.jsx";
+import CourseDetails from "./pages/CourseDetails.jsx";
+import Payment from "./pages/Payment.jsx";
 import Profile from "./pages/Profile.jsx";
 
 export default function App() {
@@ -21,8 +25,24 @@ export default function App() {
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowRoles={["student", "developer"]}>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher/dashboard"
+              element={
+                <ProtectedRoute allowRoles={["teacher", "developer"]}>
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dev/master"
+              element={
+                <ProtectedRoute allowRoles={["developer"]}>
+                  <DeveloperMaster />
                 </ProtectedRoute>
               }
             />
@@ -31,6 +51,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Courses />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courses/:courseId"
+              element={
+                <ProtectedRoute>
+                  <CourseDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courses/:courseId/payment"
+              element={
+                <ProtectedRoute>
+                  <Payment />
                 </ProtectedRoute>
               }
             />

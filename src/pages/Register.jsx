@@ -11,12 +11,12 @@ import {
   ArrowLeft,
   Loader2,
   GraduationCap,
-  BookOpenCheck,
+  Phone,
+  MapPinned,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
-
-const GRADES = ["الصف الأول الثانوي", "الصف الثاني الثانوي", "الصف الثالث الثانوي"];
+import { GOVERNORATE_OPTIONS, STUDENT_GRADES } from "../lib/authService.js";
 
 export default function Register() {
   const { register } = useAuth();
@@ -25,10 +25,11 @@ export default function Register() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    phone: "",
+    grade: STUDENT_GRADES[2],
+    governorate: GOVERNORATE_OPTIONS[0],
     password: "",
     confirmPassword: "",
-    role: "student",
-    grade: GRADES[2],
     acceptedTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -38,38 +39,27 @@ export default function Register() {
 
   function validate(values) {
     const errs = {};
+    const phoneDigits = values.phone.replace(/\D/g, "");
 
-    if (!values.name.trim()) {
-      errs.name = "من فضلك اكتب اسمك بالكامل";
-    } else if (values.name.trim().length < 3) {
-      errs.name = "الاسم قصير أوي، اكتب اسمك بالكامل";
-    }
+    if (!values.name.trim()) errs.name = "من فضلك اكتب اسمك بالكامل";
+    else if (values.name.trim().length < 3) errs.name = "الاسم قصير جدًا";
 
-    if (!values.email.trim()) {
-      errs.email = "من فضلك اكتب بريدك الإلكتروني";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
-      errs.email = "صيغة البريد الإلكتروني غير صحيحة";
-    }
+    if (!values.email.trim()) errs.email = "من فضلك اكتب بريدك الإلكتروني";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) errs.email = "صيغة البريد الإلكتروني غير صحيحة";
 
-    if (!values.password) {
-      errs.password = "من فضلك اختار كلمة مرور";
-    } else if (values.password.length < 6) {
-      errs.password = "كلمة المرور لازم تكون ٦ أحرف على الأقل";
-    }
+    if (!phoneDigits) errs.phone = "من فضلك اكتب رقم الموبايل";
+    else if (phoneDigits.length < 11) errs.phone = "رقم الموبايل غير صحيح";
 
-    if (!values.confirmPassword) {
-      errs.confirmPassword = "من فضلك أكد كلمة المرور";
-    } else if (values.confirmPassword !== values.password) {
-      errs.confirmPassword = "كلمة المرور غير متطابقة";
-    }
+    if (!values.grade) errs.grade = "من فضلك اختار الصف الدراسي";
+    if (!values.governorate) errs.governorate = "من فضلك اختار المحافظة";
 
-    if (values.role === "student" && !values.grade) {
-      errs.grade = "من فضلك اختار الصف الدراسي";
-    }
+    if (!values.password) errs.password = "من فضلك اختار كلمة مرور";
+    else if (values.password.length < 8) errs.password = "كلمة المرور لازم تكون ٨ أحرف على الأقل";
 
-    if (!values.acceptedTerms) {
-      errs.acceptedTerms = "لازم توافق على الشروط والأحكام عشان تكمل";
-    }
+    if (!values.confirmPassword) errs.confirmPassword = "من فضلك أكد كلمة المرور";
+    else if (values.confirmPassword !== values.password) errs.confirmPassword = "كلمة المرور غير متطابقة";
+
+    if (!values.acceptedTerms) errs.acceptedTerms = "لازم توافق على الشروط والأحكام عشان تكمل";
 
     return errs;
   }
@@ -77,14 +67,9 @@ export default function Register() {
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
     const nextValue = type === "checkbox" ? checked : value;
-    setForm((f) => ({ ...f, [name]: nextValue }));
-    if (errors[name]) setErrors((er) => ({ ...er, [name]: undefined }));
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
     if (serverError) setServerError("");
-  }
-
-  function handleRoleChange(role) {
-    setForm((f) => ({ ...f, role }));
-    if (errors.grade) setErrors((er) => ({ ...er, grade: undefined }));
   }
 
   async function handleSubmit(e) {
@@ -99,9 +84,10 @@ export default function Register() {
       await register({
         name: form.name.trim(),
         email: form.email.trim(),
+        phone: form.phone.trim(),
+        grade: form.grade,
+        governorate: form.governorate,
         password: form.password,
-        role: form.role,
-        grade: form.role === "student" ? form.grade : null,
       });
       navigate("/dashboard", { replace: true });
     } catch (err) {
@@ -138,9 +124,9 @@ export default function Register() {
             <div className="w-14 h-14 rounded-2xl bg-red-800 dark:bg-amber-400 text-white dark:text-slate-950 flex items-center justify-center shadow-lg shadow-red-800/20 dark:shadow-amber-400/20 mb-2">
               <Languages size={28} />
             </div>
-            <h1 className="text-2xl font-extrabold">إنشاء حساب جديد</h1>
+            <h1 className="text-2xl font-extrabold">إنشاء حساب طالب جديد</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              انضم لمنصة <span className="text-red-800 dark:text-amber-400 font-bold">الأستاذ</span> وابدأ رحلتك في اللغة العربية
+              ابدأ رحلتك الدراسية وسجّل بياناتك كاملة
             </p>
           </div>
 
@@ -154,37 +140,6 @@ export default function Register() {
           )}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
-            {/* Role selector */}
-            <div>
-              <label className="block text-sm font-bold mb-2">نوع الحساب</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange("student")}
-                  className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition-all duration-200 ${
-                    form.role === "student"
-                      ? "border-red-800 bg-red-50 text-red-800 dark:border-amber-400 dark:bg-amber-400/10 dark:text-amber-300"
-                      : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
-                  }`}
-                >
-                  <GraduationCap size={18} />
-                  طالب
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange("teacher")}
-                  className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition-all duration-200 ${
-                    form.role === "teacher"
-                      ? "border-red-800 bg-red-50 text-red-800 dark:border-amber-400 dark:bg-amber-400/10 dark:text-amber-300"
-                      : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
-                  }`}
-                >
-                  <BookOpenCheck size={18} />
-                  مدرّس
-                </button>
-              </div>
-            </div>
-
             <div>
               <label htmlFor="name" className="block text-sm font-bold mb-1.5">
                 الاسم بالكامل
@@ -210,56 +165,115 @@ export default function Register() {
               {errors.name && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.name}</p>}
             </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-bold mb-1.5">
-                البريد الإلكتروني
-              </label>
-              <div className="relative">
-                <Mail size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  placeholder="example@gmail.com"
-                  aria-invalid={Boolean(errors.email)}
-                  className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
-                    errors.email
-                      ? "border-red-400 focus:ring-red-300"
-                      : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
-                  }`}
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label htmlFor="phone" className="block text-sm font-bold mb-1.5">
+                  رقم الموبايل
+                </label>
+                <div className="relative">
+                  <Phone size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    value={form.phone}
+                    onChange={handleChange}
+                    placeholder="01XXXXXXXXX"
+                    aria-invalid={Boolean(errors.phone)}
+                    className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
+                      errors.phone
+                        ? "border-red-400 focus:ring-red-300"
+                        : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
+                    }`}
+                  />
+                </div>
+                {errors.phone && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.phone}</p>}
               </div>
-              {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email}</p>}
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-bold mb-1.5">
+                  البريد الإلكتروني
+                </label>
+                <div className="relative">
+                  <Mail size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="example@gmail.com"
+                    aria-invalid={Boolean(errors.email)}
+                    className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
+                      errors.email
+                        ? "border-red-400 focus:ring-red-300"
+                        : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
+                    }`}
+                  />
+                </div>
+                {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email}</p>}
+              </div>
             </div>
 
-            {form.role === "student" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label htmlFor="grade" className="block text-sm font-bold mb-1.5">
                   الصف الدراسي
                 </label>
-                <select
-                  id="grade"
-                  name="grade"
-                  value={form.grade}
-                  onChange={handleChange}
-                  className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 px-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
-                    errors.grade
-                      ? "border-red-400 focus:ring-red-300"
-                      : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
-                  }`}
-                >
-                  {GRADES.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <GraduationCap size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <select
+                    id="grade"
+                    name="grade"
+                    value={form.grade}
+                    onChange={handleChange}
+                    className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
+                      errors.grade
+                        ? "border-red-400 focus:ring-red-300"
+                        : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
+                    }`}
+                  >
+                    {STUDENT_GRADES.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {errors.grade && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.grade}</p>}
               </div>
-            )}
+
+              <div>
+                <label htmlFor="governorate" className="block text-sm font-bold mb-1.5">
+                  المحافظة
+                </label>
+                <div className="relative">
+                  <MapPinned size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <select
+                    id="governorate"
+                    name="governorate"
+                    value={form.governorate}
+                    onChange={handleChange}
+                    className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
+                      errors.governorate
+                        ? "border-red-400 focus:ring-red-300"
+                        : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
+                    }`}
+                  >
+                    {GOVERNORATE_OPTIONS.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {errors.governorate && (
+                  <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.governorate}</p>
+                )}
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
@@ -275,7 +289,7 @@ export default function Register() {
                     autoComplete="new-password"
                     value={form.password}
                     onChange={handleChange}
-                    placeholder="••••••••"
+                    placeholder="٨ أحرف أو أكثر"
                     aria-invalid={Boolean(errors.password)}
                     className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-11 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
                       errors.password
@@ -334,13 +348,7 @@ export default function Register() {
                   onChange={handleChange}
                   className="mt-1 w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-red-800 focus:ring-amber-400"
                 />
-                <span>
-                  موافق على{" "}
-                  <a href="#" className="text-red-800 dark:text-amber-400 font-bold hover:underline">
-                    الشروط والأحكام
-                  </a>{" "}
-                  وسياسة الخصوصية الخاصة بالمنصة
-                </span>
+                <span>موافق على الشروط والأحكام وسياسة الخصوصية الخاصة بالمنصة</span>
               </label>
               {errors.acceptedTerms && (
                 <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.acceptedTerms}</p>

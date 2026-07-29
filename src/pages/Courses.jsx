@@ -1,69 +1,30 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BookOpen } from "lucide-react";
+import { BookOpen, PlayCircle } from "lucide-react";
+import { useAuth } from "../context/AuthContext.jsx";
+import { subscribeCourses } from "../services/courseService.js";
 import AppHeader from "../components/AppHeader.jsx";
 import Footer from "../components/Footer.jsx";
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
-const courses = [
-  {
-    id: 1,
-    badge: "خصم خاص",
-    badgeColor: "bg-slate-800",
-    title: "كورس النحو والصرف كاملة",
-    tag: "٣ ثانوي",
-    price: "٣٥٠ج",
-    gradient: "from-slate-600 to-slate-900",
-  },
-  {
-    id: 2,
-    badge: "أونلاين",
-    badgeColor: "bg-emerald-700",
-    title: "كورس المراجعة النهائية كاملة (نحو + بلاغة)",
-    tag: "٣ ثانوي",
-    price: "١٢٠ج",
-    gradient: "from-teal-700 to-teal-950",
-  },
-  {
-    id: 3,
-    badge: "مجاني",
-    badgeColor: "bg-rose-700",
-    title: "الكورس التأسيسي المجاني في اللغة العربية دفعة ٢٠٢٧",
-    tag: "دفعة ٢٠٢٧",
-    price: "مجاني",
-    gradient: "from-blue-700 to-slate-900",
-  },
-  {
-    id: 4,
-    badge: "كورس مجاني",
-    badgeColor: "bg-rose-700",
-    title: "كورس ليالي الامتحان للثانوية العامة ٢٠٢٦",
-    tag: "٣ ثانوي",
-    price: "مجاني",
-    gradient: "from-rose-900 to-slate-950",
-  },
-  {
-    id: 5,
-    badge: "الأكثر طلبًا",
-    badgeColor: "bg-amber-600",
-    title: "كورس البلاغة والنقد الأدبي كاملة",
-    tag: "٢ ثانوي",
-    price: "٢٨٠ج",
-    gradient: "from-cyan-700 to-cyan-950",
-  },
-  {
-    id: 6,
-    badge: "جديد",
-    badgeColor: "bg-indigo-700",
-    title: "أساسيات القراءة والتعبير للصف الأول الثانوي",
-    tag: "١ ثانوي",
-    price: "١٥٠ج",
-    gradient: "from-stone-600 to-stone-900",
-  },
-];
+function getFinalPrice(course) {
+  const base = Number(course.price || 0);
+  const discount = Number(course.discountPercent || 0);
+  if (discount <= 0) return base;
+  return Math.max(0, Math.round(base * (1 - discount / 100)));
+}
 
 export default function Courses() {
+  const { user } = useAuth();
+  const [courses, setCourses] = useState([]);
+
+  useEffect(() => subscribeCourses(setCourses), []);
+
+  const enrolledSet = useMemo(() => new Set(user?.enrolledCourses || []), [user?.enrolledCourses]);
+
   return (
     <div
       dir="rtl"
@@ -75,55 +36,87 @@ export default function Courses() {
         <div className="mb-10 text-center sm:text-right">
           <h1 className="text-2xl sm:text-3xl font-extrabold">الكورسات</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            كل كورسات اللغة العربية في مكان واحد، اختار اللي يناسب صفك الدراسي.
+            الكورسات مرتبة حسب خطة LMS: اشترك ثم ابدأ الدروس والكويزات بالترتيب.
           </p>
         </div>
 
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={stagger}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          {courses.map((c) => (
-            <motion.div
-              key={c.id}
-              variants={fadeUp}
-              whileHover={{ y: -6 }}
-              className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:shadow-slate-300/50 dark:hover:shadow-black/40 transition-all duration-300 overflow-hidden flex flex-col"
-            >
-              <div
-                className={`h-40 w-full flex items-center justify-center text-white relative bg-gradient-to-br ${c.gradient} overflow-hidden`}
+        <motion.div initial="hidden" animate="show" variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course) => {
+            const enrolled = enrolledSet.has(course.id);
+            const finalPrice = getFinalPrice(course);
+            return (
+              <motion.div
+                key={course.id}
+                variants={fadeUp}
+                whileHover={{ y: -6 }}
+                className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:shadow-slate-300/50 dark:hover:shadow-black/40 transition-all duration-300 overflow-hidden flex flex-col"
               >
-                <span
-                  className={`absolute top-2 right-2 text-xs font-bold text-white px-2 py-1 rounded-md ${c.badgeColor} shadow-sm`}
-                >
-                  {c.badge}
-                </span>
-                <BookOpen
-                  size={40}
-                  className="opacity-70 group-hover:scale-110 group-hover:opacity-90 transition-all duration-500"
-                />
-              </div>
-              <div className="p-4 flex flex-col gap-3 flex-1 text-right">
-                <h3 className="font-bold text-sm leading-snug flex-1 group-hover:text-red-800 dark:group-hover:text-amber-400 transition-colors duration-300">
-                  {c.title}
-                </h3>
-                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span>{c.tag}</span>
-                  <span className="font-bold text-red-800 dark:text-amber-400">{c.price}</span>
+                <div className="h-44 w-full overflow-hidden relative">
+                  {course.thumbnailUrl ? (
+                    <img
+                      src={course.thumbnailUrl}
+                      alt={course.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white">
+                      <BookOpen size={40} />
+                    </div>
+                  )}
+                  {Number(course.discountPercent || 0) > 0 && (
+                    <span className="absolute top-2 right-2 text-xs font-bold text-white bg-red-700 px-2 py-1 rounded-md shadow-sm">
+                      خصم {course.discountPercent}%
+                    </span>
+                  )}
                 </div>
-                <div className="flex flex-col gap-2 pt-2">
-                  <button className="border border-red-800 dark:border-amber-400 text-red-800 dark:text-amber-400 rounded-lg py-2 text-sm font-bold hover:bg-red-800 hover:text-white dark:hover:bg-amber-400 dark:hover:text-slate-950 transition-all duration-300 active:scale-[0.97]">
-                    الدخول للكورس
-                  </button>
-                  <button className="bg-red-700 text-white rounded-lg py-2 text-sm font-bold hover:bg-red-800 hover:shadow-md hover:shadow-red-700/30 transition-all duration-300 active:scale-[0.97]">
-                    الإشتراك في الكورس!
-                  </button>
+
+                <div className="p-4 flex flex-col gap-3 flex-1 text-right">
+                  <h3 className="font-bold text-sm leading-snug flex-1 group-hover:text-red-800 dark:group-hover:text-amber-400 transition-colors duration-300">
+                    {course.title}
+                  </h3>
+
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 min-h-8">
+                    {course.description || "كورس شامل مع فيديوهات وكويزات منظمة."}
+                  </p>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>{course.grade || "ثانوي"}</span>
+                    <div className="flex items-center gap-2">
+                      {Number(course.discountPercent || 0) > 0 && (
+                        <span className="line-through text-slate-400">{course.price || 0} ج.م</span>
+                      )}
+                      <span className="font-bold text-red-800 dark:text-amber-400">
+                        {finalPrice === 0 ? "مجاني" : `${finalPrice} ج.م`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Link
+                      to={`/courses/${course.id}`}
+                      className="text-center border border-red-800 dark:border-amber-400 text-red-800 dark:text-amber-400 rounded-lg py-2 text-sm font-bold hover:bg-red-800 hover:text-white dark:hover:bg-amber-400 dark:hover:text-slate-950 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-1"
+                    >
+                      <PlayCircle size={16} />
+                      {enrolled ? "الدخول للكورس" : "معاينة المحتوى"}
+                    </Link>
+
+                    {enrolled ? (
+                      <span className="text-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-lg py-2 text-sm font-bold">
+                        مشترك بالفعل
+                      </span>
+                    ) : (
+                      <Link
+                        to={`/courses/${course.id}/payment`}
+                        className="text-center bg-red-700 text-white rounded-lg py-2 text-sm font-bold hover:bg-red-800 hover:shadow-md hover:shadow-red-700/30 transition-all duration-300 active:scale-[0.97]"
+                      >
+                        الاشتراك في الكورس
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </motion.div>
       </main>
 

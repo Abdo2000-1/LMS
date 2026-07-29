@@ -1,27 +1,42 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Mail, GraduationCap, LogOut, Check } from "lucide-react";
+import { User, Mail, GraduationCap, LogOut, Check, Phone, MapPinned } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import AppHeader from "../components/AppHeader.jsx";
 import Footer from "../components/Footer.jsx";
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState(user?.name || "");
   const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [serverError, setServerError] = useState("");
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault();
-    // ملحوظة: التعديل هنا شكلي فقط دلوقتي، لحد ما يتربط بـ endpoint حقيقي زي
-    // PATCH /api/users/:id في الباك اند بتاعك بـ Node.js
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    if (!name.trim()) {
+      setServerError("الاسم لا يمكن يكون فاضي.");
+      return;
+    }
+
+    setIsSaving(true);
+    setSaved(false);
+    setServerError("");
+    try {
+      await updateProfile({ name: name.trim() });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (error) {
+      setServerError(error.message || "حصل خطأ أثناء حفظ التعديلات.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     navigate("/", { replace: true });
   }
 
@@ -46,12 +61,25 @@ export default function Profile() {
             <div>
               <h1 className="text-xl font-extrabold">{user?.name}</h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {user?.role === "teacher" ? "مدرّس" : `طالب — ${user?.grade || ""}`}
+                {user?.role === "teacher"
+                  ? "مدرّس"
+                  : user?.role === "developer"
+                    ? "مطور"
+                    : `طالب — ${user?.grade || ""}`}
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSave} className="space-y-5">
+            {serverError && (
+              <div
+                role="alert"
+                className="text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/40 rounded-xl px-4 py-3 text-right"
+              >
+                {serverError}
+              </div>
+            )}
+
             <div>
               <label htmlFor="name" className="block text-sm font-bold mb-1.5">
                 الاسم
@@ -61,8 +89,23 @@ export default function Profile() {
                 <input
                   id="name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (serverError) setServerError("");
+                  }}
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-amber-300 focus:border-amber-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-1.5">رقم الموبايل</label>
+              <div className="relative">
+                <Phone size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={user?.phone || ""}
+                  disabled
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 pr-11 pl-4 py-3 text-sm outline-none cursor-not-allowed"
                 />
               </div>
             </div>
@@ -80,15 +123,29 @@ export default function Profile() {
             </div>
 
             {user?.role === "student" && (
-              <div>
-                <label className="block text-sm font-bold mb-1.5">الصف الدراسي</label>
-                <div className="relative">
-                  <GraduationCap size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={user?.grade || ""}
-                    disabled
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 pr-11 pl-4 py-3 text-sm outline-none cursor-not-allowed"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">الصف الدراسي</label>
+                  <div className="relative">
+                    <GraduationCap size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={user?.grade || ""}
+                      disabled
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 pr-11 pl-4 py-3 text-sm outline-none cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">المحافظة</label>
+                  <div className="relative">
+                    <MapPinned size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={user?.governorate || ""}
+                      disabled
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 pr-11 pl-4 py-3 text-sm outline-none cursor-not-allowed"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -96,10 +153,11 @@ export default function Profile() {
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 type="submit"
+                disabled={isSaving}
                 className="flex-1 bg-red-800 text-white font-extrabold rounded-xl py-3 hover:bg-red-900 hover:shadow-lg hover:shadow-red-800/30 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-2"
               >
                 {saved && <Check size={18} />}
-                {saved ? "اتحفظ بنجاح" : "حفظ التعديلات"}
+                {isSaving ? "جاري الحفظ..." : saved ? "اتحفظ بنجاح" : "حفظ التعديلات"}
               </button>
               <button
                 type="button"

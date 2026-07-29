@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, Languages, ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { Phone, Lock, Eye, EyeOff, Languages, ArrowLeft, Loader2, Shield } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 
+const TEACHER_PHONE = import.meta.env.VITE_TEACHER_PHONE || "";
+const DEVELOPER_PHONE = import.meta.env.VITE_DEVELOPER_PHONE || "";
+
 export default function Login() {
-  const { login } = useAuth();
+  const { login, getLandingRouteByRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = location.state?.from?.pathname || "/dashboard";
 
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ phone: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
@@ -19,25 +21,21 @@ export default function Login() {
 
   function validate(values) {
     const errs = {};
-    if (!values.email.trim()) {
-      errs.email = "من فضلك اكتب بريدك الإلكتروني";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
-      errs.email = "صيغة البريد الإلكتروني غير صحيحة";
-    }
+    const digits = values.phone.replace(/\D/g, "");
 
-    if (!values.password) {
-      errs.password = "من فضلك اكتب كلمة المرور";
-    } else if (values.password.length < 6) {
-      errs.password = "كلمة المرور لازم تكون ٦ أحرف على الأقل";
-    }
+    if (!digits) errs.phone = "من فضلك اكتب رقم الموبايل";
+    else if (digits.length < 11) errs.phone = "رقم الموبايل غير صحيح";
+
+    if (!values.password) errs.password = "من فضلك اكتب كلمة المرور";
+    else if (values.password.length < 8) errs.password = "كلمة المرور لازم تكون ٨ أحرف على الأقل";
 
     return errs;
   }
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
-    if (errors[name]) setErrors((er) => ({ ...er, [name]: undefined }));
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
     if (serverError) setServerError("");
   }
 
@@ -50,19 +48,16 @@ export default function Login() {
     setIsSubmitting(true);
     setServerError("");
     try {
-      await login({ email: form.email.trim(), password: form.password });
-      navigate(redirectTo, { replace: true });
+      const user = await login({ phone: form.phone, password: form.password });
+      const roleHome = getLandingRouteByRole(user?.role);
+      const fromPath = location.state?.from?.pathname;
+      const target = fromPath && fromPath !== "/login" ? fromPath : roleHome;
+      navigate(target, { replace: true });
     } catch (err) {
       setServerError(err.message || "حصل خطأ أثناء تسجيل الدخول، حاول تاني.");
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  function fillDemoStudent() {
-    setForm({ email: "example@gmail.com", password: "123456" });
-    setErrors({});
-    setServerError("");
   }
 
   return (
@@ -94,22 +89,33 @@ export default function Login() {
             </div>
             <h1 className="text-2xl font-extrabold">تسجيل الدخول</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              اهلاً بيك تاني في منصة{" "}
-              <span className="text-red-800 dark:text-amber-400 font-bold">الأستاذ</span>
+              تسجيل الدخول يتم برقم الهاتف وكلمة المرور فقط
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={fillDemoStudent}
-            className="w-full mb-6 flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-400/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-400/20 rounded-xl px-4 py-3 text-right hover:bg-amber-100 dark:hover:bg-amber-400/20 transition-colors duration-300"
-          >
-            <Sparkles size={16} className="shrink-0 mt-0.5" />
-            <span>
-              <span className="font-bold block mb-1">عايز تجرب المنصة بسرعة؟</span>
-              دوس هنا عشان تملأ بيانات حساب طالب تجريبي (example@gmail.com) وتدخل تستكشف الداشبورد.
-            </span>
-          </button>
+          <div className="space-y-2 mb-6">
+            {TEACHER_PHONE && (
+              <button
+                type="button"
+                onClick={() => setForm({ phone: TEACHER_PHONE, password: "" })}
+                className="w-full flex items-start gap-2 text-xs bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-300"
+              >
+                <Shield size={16} className="shrink-0 mt-0.5" />
+                <span>حساب المدرّس الخاص.</span>
+              </button>
+            )}
+
+            {DEVELOPER_PHONE && (
+              <button
+                type="button"
+                onClick={() => setForm({ phone: DEVELOPER_PHONE, password: "" })}
+                className="w-full flex items-start gap-2 text-xs bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-300"
+              >
+                <Shield size={16} className="shrink-0 mt-0.5" />
+                <span>حساب المطور الرئيسي.</span>
+              </button>
+            )}
+          </div>
 
           {serverError && (
             <div
@@ -122,39 +128,34 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-bold mb-1.5">
-                البريد الإلكتروني
+              <label htmlFor="phone" className="block text-sm font-bold mb-1.5">
+                رقم الموبايل
               </label>
               <div className="relative">
-                <Mail size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Phone size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={form.email}
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={form.phone}
                   onChange={handleChange}
-                  placeholder="example@gmail.com"
-                  aria-invalid={Boolean(errors.email)}
+                  placeholder="01XXXXXXXXX"
+                  aria-invalid={Boolean(errors.phone)}
                   className={`w-full rounded-xl border bg-slate-50 dark:bg-slate-800 pr-11 pl-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 ${
-                    errors.email
+                    errors.phone
                       ? "border-red-400 focus:ring-red-300"
                       : "border-slate-200 dark:border-slate-700 focus:ring-amber-300 focus:border-amber-400"
                   }`}
                 />
               </div>
-              {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email}</p>}
+              {errors.phone && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.phone}</p>}
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="block text-sm font-bold">
-                  كلمة المرور
-                </label>
-                <a href="#" className="text-xs font-bold text-red-800 dark:text-amber-400 hover:underline">
-                  نسيت كلمة المرور؟
-                </a>
-              </div>
+              <label htmlFor="password" className="block text-sm font-bold mb-1.5">
+                كلمة المرور
+              </label>
               <div className="relative">
                 <Lock size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input

@@ -1,8 +1,8 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
-export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+export default function ProtectedRoute({ children, allowRoles = [] }) {
+  const { isAuthenticated, isLoading, user, getLandingRouteByRole } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -15,6 +15,10 @@ export default function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowRoles.length > 0 && !allowRoles.includes(user?.role)) {
+    return <Navigate to={getLandingRouteByRole(user?.role)} replace />;
   }
 
   return children;

@@ -1,71 +1,110 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { loginRequest, registerRequest } from "../lib/authService.js";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import {
+  getLandingRouteByRole,
+  loginRequest,
+  logoutRequest,
+  registerRequest,
+  updateProfileRequest,
+  watchAuthState,
+} from "../lib/authService.js";
+import { db } from "../services/firebase.js";
 
 const AuthContext = createContext(null);
-const STORAGE_KEY = "alostaz_auth";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  // isLoading هنا معناها "لسه بنقرأ الجلسة المحفوظة"، مش لودينج طلب تسجيل الدخول نفسه
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setUser(parsed.user ?? null);
-        setToken(parsed.token ?? null);
+    let unsubscribeProfile = null;
+
+    const unsubscribe = watchAuthState((nextUser, nextToken) => {
+      setToken(nextToken);
+
+      if (!nextUser) {
+        if (unsubscribeProfile) {
+          unsubscribeProfile();
+          unsubscribeProfile = null;
+        }
+        setUser(null);
+        setIsLoading(false);
+        return;
       }
-    } catch {
-      // تجاهل أي خطأ في قراءة الجلسة المحفوظة، هيبقى المستخدم لسه مسجل خروج
-    } finally {
-      setIsLoading(false);
-    }
+
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+
+      unsubscribeProfile = onSnapshot(
+        doc(db, "users", nextUser.uid),
+        (snapshot) => {
+          const profile = snapshot.exists() ? snapshot.data() : {};
+          setUser({
+            ...nextUser,
+            ...profile,
+            uid: nextUser.uid,
+            enrolledCourses: profile.enrolledCourses || nextUser.enrolledCourses || [],
+            progress: profile.progress || nextUser.progress || {},
+          });
+          setIsLoading(false);
+        },
+        () => {
+          setUser(nextUser);
+          setIsLoading(false);
+        }
+      );
+    });
+
+    return () => {
+      unsubscribe();
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+    };
   }, []);
 
-  function persistSession(nextUser, nextToken) {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ user: nextUser, token: nextToken })
-    );
-  }
-
-  async function login({ email, password }) {
-    const { user: loggedInUser, token: newToken } = await loginRequest({
-      email,
-      password,
-    });
+  async function login(payload) {
+    const { user: loggedInUser, token: nextToken } = await loginRequest(payload);
     setUser(loggedInUser);
-    setToken(newToken);
-    persistSession(loggedInUser, newToken);
+    setToken(nextToken);
     return loggedInUser;
   }
 
   async function register(payload) {
-    const { user: newUser, token: newToken } = await registerRequest(payload);
+    const { user: newUser, token: nextToken } = await registerRequest(payload);
     setUser(newUser);
-    setToken(newToken);
-    persistSession(newUser, newToken);
+    setToken(nextToken);
     return newUser;
   }
 
-  function logout() {
-    setUser(null);
-    setToken(null);
-    window.localStorage.removeItem(STORAGE_KEY);
+  async function updateProfile(payload) {
+    const { user: updatedUser } = await updateProfileRequest(payload);
+    setUser(updatedUser);
+    return updatedUser;
   }
 
-  const value = {
-    user,
-    token,
-    isLoading,
-    isAuthenticated: Boolean(user && token),
-    login,
-    register,
-    logout,
-  };
+  async function logout() {
+    await logoutRequest();
+    setUser(null);
+    setToken(null);
+  }
+
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      isLoading,
+      isAuthenticated: Boolean(user && token),
+      login,
+      register,
+      updateProfile,
+      logout,
+      getLandingRouteByRole,
+    }),
+    [user, token, isLoading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
